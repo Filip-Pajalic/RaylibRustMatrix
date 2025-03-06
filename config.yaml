@@ -1,0 +1,15 @@
+world:
+  window_width: 1920
+  window_height: 1080
+  font_size: 40
+row:
+  padding : 1
+  base_spawn_time: 10
+  bounding_box_offset_y: [20,20]
+glyph:
+  child_spawn_time: 10
+  max_age: 10
+  padding: 1
+  fade_time: 10
+  bloom: false
+debug: false
