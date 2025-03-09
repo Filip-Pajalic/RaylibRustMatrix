@@ -11,15 +11,16 @@ pub enum Easing {
 
 #[derive(Debug)]
 pub struct Transition {
-    duration: Duration,
-    easing: Easing,
+    pub(crate) duration: Option<Duration>,
+    pub(crate) easing: Option<Easing>,
+    pub(crate) triggered: bool,
 }
 
 #[derive(Debug)]
 pub struct AnimationStep {
-    color: Color,
-    duration: Duration,
-    transition: Option<Transition>,
+    pub(crate) color: Color,
+    pub(crate) duration: Duration,
+    pub(crate) transition: Option<Transition>,
 }
 
 #[derive(Debug)]
@@ -28,53 +29,25 @@ pub struct Animation {
     timer: Instant,
     steps: Vec<AnimationStep>,
     current_step: usize,
+    pub concluded: bool,
 }
 
 impl Animation {
-    pub fn new() -> Self {
-        let mut anim = Animation {
+    pub fn new(steps: Vec<AnimationStep>) -> Self {
+         Animation {
             current_color: Color::WHITE,
             timer: Instant::now(),
-            steps: vec![],
+            steps,
             current_step: 0,
-        };
-        anim.create_animation_steps();
-        anim
+            concluded: false,
+        }
     }
 
-    fn create_animation_steps(&mut self) {
-        let steps = vec![
-            AnimationStep {
-                color: Color::WHITE,
-                duration: Duration::from_millis(100),
-                transition: Some(Transition {
-                    duration: Duration::from_millis(100),
-                    easing: EaseOut,
-                }),
-            },
-            AnimationStep {
-                color: Color::GREEN,
-                duration: Duration::from_millis(5000),
-                transition: Some(Transition {
-                    duration: Duration::from_millis(2000),
-                    easing: EaseOut,
-                }),
-            },
-            AnimationStep {
-                color: Color::BLACK,
-                duration: Duration::from_millis(500),
-                transition: Some(Transition {
-                    // Transition for the last step
-                    duration: Duration::from_millis(2000),
-                    easing: EaseOut,
-                }),
-            },
-        ];
-        self.steps = steps;
-    }
+
 
     pub fn update(&mut self) {
         if self.steps.is_empty() {
+            self.concluded = true;
             return;
         }
         self.update_color();
@@ -96,8 +69,16 @@ impl Animation {
     fn calculate_transition_color(&self, current_step: &AnimationStep) -> Color {
         let elapsed_transition = self.timer.elapsed() - current_step.duration;
         let transition = current_step.transition.as_ref().unwrap();
-        let t = elapsed_transition.as_secs_f32() / transition.duration.as_secs_f32();
-        let eased_t = self.apply_easing(t, &transition.easing);
+        let transition_duration = transition.duration.unwrap_or(Duration::ZERO); // Handle Option<Duration>
+        let t = if transition_duration == Duration::ZERO {
+            1.0 // If no transition duration, consider it 100% transitioned
+        } else {
+            (elapsed_transition.as_secs_f32() / transition_duration.as_secs_f32()).min(1.0)
+            // Clamp to 1.0
+        };
+
+        let easing_type = transition.easing.as_ref().unwrap_or(&Easing::Linear); // Default to Linear if None
+        let eased_t = self.apply_easing(t, easing_type);
         let next_color = self.steps[self.current_step + 1].color;
         interpolate(current_step.color, next_color, eased_t)
     }
@@ -112,6 +93,7 @@ impl Animation {
 
     fn advance_step_if_needed(&mut self) {
         if self.is_last_step() {
+            self.concluded = true;
             return;
         }
 
@@ -126,7 +108,13 @@ impl Animation {
 
     fn calculate_total_duration(&self, current_step: &AnimationStep) -> Duration {
         if !self.is_last_step() && current_step.transition.is_some() {
-            current_step.duration + current_step.transition.as_ref().unwrap().duration
+            current_step.duration
+                + current_step
+                    .transition
+                    .as_ref()
+                    .unwrap()
+                    .duration
+                    .unwrap_or(Duration::ZERO) // Handle Option<Duration>
         } else {
             current_step.duration
         }

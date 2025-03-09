@@ -1,15 +1,25 @@
 world:
-  window_width: 1920
-  window_height: 1080
-  font_size: 40
+  window_width_px: 1920
+  window_height_px: 1080
+
+  font_size_px: 40  # Controls grid size and font size
+
+  # Extra spawn area outside the screen (in grid units)
+  spawn_buffer_left: 10
+  spawn_buffer_right: 10
+  spawn_buffer_top: 10
+  spawn_buffer_bottom: 10
+
 row:
-  padding : 1
-  base_spawn_time: 10
-  bounding_box_offset_y: [20,20]
+  row_spacing: 1
+  min_spawn_interval_ms: 10
+  max_spawn_interval_ms: 100
+
 glyph:
-  child_spawn_time: 10
-  max_age: 10
-  padding: 1
-  fade_time: 10
-  bloom: false
+  child_spawn_interval_ms: 80
+  glyph_change_interval_min_ms: 70
+  glyph_change_interval_max_ms: 200
+  glyph_spacing_x: 1
+  fade_duration_ms: 10
+
 debug: false

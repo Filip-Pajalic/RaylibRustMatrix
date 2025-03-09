@@ -5,7 +5,7 @@ use crate::config::Config;
 use crate::matrix::matrix_row::MatrixRow;
 use raylib::prelude::*;
 
-pub(crate) const CHILD_SPAWN_TIME: usize = 50;
+pub(crate) const CHILD_SPAWN_TIME: usize = 500;
 
 const MIN_FONT_SIZE: i32 = 10;
 const MAX_FONT_SIZE: i32 = 200;
@@ -32,7 +32,7 @@ impl MatrixWorld {
             height_internal: 0, //height+200,
             font_width: 10,     //fix some proper value here
         };
-        matrix.font_height = matrix.config.read().unwrap().world.font_size;
+        matrix.font_height = matrix.config.read().unwrap().world.font_size_px;
         matrix.calculate_font_grid_size();
         for i in 0..matrix.width {
             matrix
@@ -50,8 +50,7 @@ impl MatrixWorld {
         for row in self.rows.iter_mut() {
             row.update(d, font);
         }
-        if self.config.read().unwrap().debug{
-
+        if self.config.read().unwrap().debug {
             self.debug_grid(d, font);
         }
     }
@@ -109,11 +108,9 @@ impl MatrixWorld {
     }
 
     pub fn debug_grid(&mut self, d: &mut RaylibDrawHandle, font: &mut Font) {
-
         let (mut grid_size_x, mut grid_size_y) = self.calculate_grid_size();
         let (mut grid_offset_x, mut grid_offset_y) = self.get_grid_offset();
         self.update_font_width(font);
-
 
         let (min, max) = self.get_height_internal_offset_range();
         //let offset = self.get_character_offset(font, "A"); // so the grid is not over /font offset
@@ -132,8 +129,8 @@ impl MatrixWorld {
 
     fn calculate_font_grid_size(&mut self) {
         if let Ok(cfg) = self.config.read() {
-            self.width = cfg.world.window_width / 10;
-            self.height = cfg.world.window_height / 10;
+            self.width = cfg.world.window_width_px / 10;
+            self.height = cfg.world.window_height_px / 10;
         }
     }
 

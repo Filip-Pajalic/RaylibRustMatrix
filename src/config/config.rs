@@ -11,23 +11,29 @@ pub struct Config {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct World {
-    pub window_height: i32,
-    pub window_width: i32,
-    pub font_size: i32,
+    pub window_width_px: i32,
+    pub window_height_px: i32,
+    pub font_size_px: i32,
+    pub spawn_buffer_left: i32,
+    pub spawn_buffer_right: i32,
+    pub spawn_buffer_top: i32,
+    pub spawn_buffer_bottom: i32,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Row {
-    pub base_spawn_time: i32,
-    pub padding: i32,
-    pub bounding_box_offset_y: Vec<i32>,
+    pub row_spacing: i32,
+    pub min_spawn_interval_ms: i32,
+    pub max_spawn_interval_ms: i32,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Glyph {
-    pub child_spawn_time: i32,
-    pub max_age: i32,
-    pub padding: i32,
+    pub child_spawn_interval_ms: i32,
+    pub glyph_change_interval_min_ms: i32,
+    pub glyph_change_interval_max_ms: i32,
+    pub glyph_spacing_x: i32,
+    pub fade_duration_ms: i32,
 }
 
 impl Config {

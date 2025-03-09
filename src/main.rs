@@ -18,8 +18,8 @@ fn main() {
     let mut matrix = MatrixWorld::new(game_state.config.clone());
 
     let config_read = game_state.config.read().unwrap();
-    let window_width = config_read.world.window_width;
-    let window_height = config_read.world.window_height;
+    let window_width = config_read.world.window_width_px;
+    let window_height = config_read.world.window_height_px;
 
     let (mut rl, thread) = init()
         .size(window_width, window_height)
@@ -27,7 +27,7 @@ fn main() {
         .build();
     rl.set_target_fps(10);
     let mut font = rl.load_font(&thread, "resources/matrix-code.ttf").unwrap();
-    font.baseSize = config_read.world.font_size.clone();
+    font.baseSize = config_read.world.font_size_px.clone();
     rl.gui_enable();
 
     drop(config_read);

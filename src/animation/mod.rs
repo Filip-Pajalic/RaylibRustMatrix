@@ -1,3 +1,3 @@
-mod animation;
+pub(crate) mod animation;
 
 pub use animation::Animation;
