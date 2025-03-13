@@ -1,24 +1,23 @@
+use crate::animation::animation::{AnimationStep, Easing, Transition};
 use crate::animation::Animation;
+use crate::matrix::util::{random_duration, AlphanumericMatrix};
 use crate::FONT_WIDTH;
-use rand::distr::Distribution;
-use rand::{ Rng, RngCore};
+use rand::{Rng};
 use raylib::color::Color;
 use raylib::drawing::{RaylibDraw, RaylibDrawHandle};
 use raylib::math::Vector2;
 use raylib::prelude::Font;
 use std::time::{Duration, Instant};
-use crate::animation::animation::AnimationStep;
 
-#[derive(Debug)]
 pub struct MatrixCharacter {
     pub y_pos: i32,
     pub x_pos: i32,
     pub glyph: char,
     pub color: Color,
-    pub max_child_depth: i32,
+    pub max_ancestors: u32,
     pub child: Option<Box<MatrixCharacter>>,
-    pub child_spawn_time: Instant,
-    pub age: Instant,
+    pub child_spawn_timer: Instant,
+    pub child_spawn_time: u64,
     pub glyph_change_timer: Instant,
     pub glyph_change_interval: Duration,
     pub alive: bool,
@@ -26,63 +25,61 @@ pub struct MatrixCharacter {
 }
 
 #[repr(u32)]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 enum MatrixColor {
     GREEN = 0x003B00F,
-    WHITE = 0xFFFFFFF,
-    BLACK = 0x0000000,
 }
 
 impl MatrixColor {
     fn to_color(self, alpha: u8) -> Color {
-        let hex = self as u32; // Extract the hex value
+        let hex = self as u32;
         let r = ((hex >> 16) & 0xFF) as u8;
         let g = ((hex >> 8) & 0xFF) as u8;
         let b = (hex & 0xFF) as u8;
-        Color { r, g, b, a: alpha } // Default alpha to 255 (fully opaque)
+        Color { r, g, b, a: alpha }
     }
 }
 
 impl MatrixCharacter {
-    pub fn new(y_pos: i32, x_pos: i32, max_depth: i32) -> Self {
-        let duration = random_duration(Duration::from_millis(100), Duration::from_millis(700));
-
+    pub fn new(y_pos: i32, x_pos: i32, max_ancestors: u32, child_spawn_time: u64) -> Self {
         let mut rng = rand::rng();
-        let transparency = rng.random_range(50..=255) as u8;
-        let mut matrix_char = MatrixCharacter {
+        MatrixCharacter {
             y_pos,
             x_pos,
-            glyph: '1',
-            color: MatrixColor::WHITE.to_color(255),
+            glyph: Self::generate_random_character(),
+            color: Color::WHITE,
             child: None,
-            max_child_depth: max_depth,
-            child_spawn_time: Instant::now(),
-            age: Instant::now(),
+            max_ancestors,
+            child_spawn_timer: Instant::now(),
+            child_spawn_time,
             glyph_change_timer: Instant::now(),
-            glyph_change_interval: duration,
+            glyph_change_interval: random_duration(
+                Duration::from_millis(100),
+                Duration::from_millis(700),
+            ),
             alive: true,
-            animation: Animation::new(Self::create_animation_steps(transparency)),
-        };
-        matrix_char.glyph = matrix_char.generate_random_character();
-        matrix_char
+            animation: Animation::new(Self::create_animation_steps(
+                rng.random_range(50..=255) as u8
+            )),
+        }
     }
 
     fn spawn_child(&mut self) {
         if self.child.is_none()
-            && self.y_pos <= self.max_child_depth
-            && self.child_spawn_time.elapsed()
-                > Duration::from_millis(crate::matrix::matrix_world::CHILD_SPAWN_TIME as u64)
+            && self.y_pos <= self.max_ancestors as i32
+            && self.child_spawn_timer.elapsed() > Duration::from_millis(self.child_spawn_time)
         {
             self.child = Some(Box::new(MatrixCharacter::new(
                 self.y_pos + 1,
                 self.x_pos,
-                self.max_child_depth.clone(),
-            )))
+                self.max_ancestors.clone(),
+                self.child_spawn_time,
+            )));
+            self.animation.trigger_transition();
         }
     }
-    fn generate_random_character(&self) -> char {
+    pub fn generate_random_character() -> char {
         let mut rng = rand::rng();
-
         rng.sample(AlphanumericMatrix) as char
     }
     fn symbol_to_string(&self) -> String {
@@ -108,11 +105,10 @@ impl MatrixCharacter {
 
     fn update_appearance(&mut self) {
         if self.glyph_change_timer.elapsed() >= self.glyph_change_interval {
-            self.glyph = self.generate_random_character();
+            self.glyph = Self::generate_random_character();
             self.glyph_change_timer = Instant::now()
         }
 
-        // let t = current_age.as_secs_f32() / self.max_depth.clone() as f32;
         self.animation.update();
         self.color = self.animation.current_color;
     }
@@ -137,62 +133,19 @@ impl MatrixCharacter {
             AnimationStep {
                 color: Color::WHITE,
                 duration: Duration::from_millis(100),
-                transition: Some(crate::animation::animation::Transition {
-                    duration: None,
-                    easing: None,
-                    triggered: true,
-                }),
+                transition: Transition::new(Duration::from_millis(1000), Easing::EaseOut, true),
             },
             AnimationStep {
                 color: MatrixColor::GREEN.to_color(alpha),
                 duration: Duration::from_millis(3000),
-                transition: Some(crate::animation::animation::Transition {
-                    duration: Some(Duration::from_millis(1000)),
-                    easing: Some(crate::animation::animation::Easing::EaseOut),
-                    triggered: false,
-                }),
+                transition: Transition::new(Duration::from_millis(1000), Easing::EaseOut, false),
             },
             AnimationStep {
                 color: Color::BLACK,
                 duration: Duration::from_millis(500),
-                transition: Some(crate::animation::animation::Transition {
-                    // Transition for the last step
-                    duration: Some(Duration::from_millis(2000)),
-                    easing: Some(crate::animation::animation::Easing::EaseOut),
-                    triggered: false,
-                }),
+                transition: Transition::new(Duration::from_millis(2000), Easing::EaseOut, false),
             },
         ];
-       steps
+        steps
     }
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct AlphanumericMatrix;
-
-impl Distribution<u8> for AlphanumericMatrix {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> u8 {
-        const RANGE: u32 = 10 + 9;
-
-        const GEN_ASCII_STR_CHARSET: &[u8] = b"EIOPQRTUWY\
-                012345789";
-        // We can pick from 62 characters. This is so close to a power of 2, 64,
-        // that we can do better than `Uniform`. Use a simple bitshift and
-        // rejection sampling. We do not use a bitmask, because for small RNGs
-        // the most significant bits are usually of higher quality.
-        loop {
-            let var = rng.next_u32() >> (32 - 6);
-            if var < RANGE {
-                return GEN_ASCII_STR_CHARSET[var as usize];
-            }
-        }
-    }
-}
-
-fn random_duration(min: Duration, max: Duration) -> Duration {
-    let mut rng = rand::rng();
-    let range = max.as_millis() - min.as_millis();
-    let random_millis = rng.random_range(0..=range) as u64;
-    min + Duration::from_millis(random_millis)
 }

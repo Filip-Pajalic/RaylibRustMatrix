@@ -1,54 +1,79 @@
-use crate::FONT_WIDTH;
+use std::error::Error;
+use std::fmt;
+use std::fmt::Formatter;
 use std::sync::{Arc, RwLock};
 
 use crate::config::Config;
-use crate::matrix::matrix_row::MatrixRow;
+use crate::matrix::matrix_col::MatrixCol;
 use raylib::prelude::*;
 
-pub(crate) const CHILD_SPAWN_TIME: usize = 500;
+#[derive(Debug, Clone)]
+pub struct MatrixError {
+    pub message: String,
+}
 
-const MIN_FONT_SIZE: i32 = 10;
-const MAX_FONT_SIZE: i32 = 200;
+impl MatrixError {
+    pub fn new(message: &str) -> Self {
+        MatrixError {
+            message: message.to_string(),
+        }
+    }
+}
 
-#[derive(Debug)]
+impl fmt::Display for MatrixError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "MatrixError: {}", self.message)
+    }
+}
+
+impl Error for MatrixError {}
+
 pub struct MatrixWorld {
     pub width: i32,
     pub height: i32,
     pub font_height: i32,
     pub font_width: i32,
     pub height_internal: i32,
-    pub rows: Vec<MatrixRow>,
+    pub cols: Vec<MatrixCol>,
     pub config: Arc<RwLock<Config>>,
 }
 
 impl MatrixWorld {
-    pub fn new(config: Arc<RwLock<Config>>) -> Self {
+    pub fn new(config: Arc<RwLock<Config>>) -> Result<Self, MatrixError> {
         let mut matrix = MatrixWorld {
             width: 0,
             height: 0,
-            rows: vec![],
+            font_height: 0,
+            cols: vec![],
             config,
-            font_height: 100,
-            height_internal: 0, //height+200,
-            font_width: 10,     //fix some proper value here
+            height_internal: 0,
+            font_width: 0,
         };
-        matrix.font_height = matrix.config.read().unwrap().world.font_size_px;
+        matrix.font_height = matrix
+            .config
+            .read()
+            .map_err(|_| MatrixError::new("Failed to acquire read lock on config"))?
+            .world
+            .font_size_px;
         matrix.calculate_font_grid_size();
-        for i in 0..matrix.width {
-            matrix
-                .rows
-                .push(MatrixRow::new(i, matrix.height, matrix.width));
+        for column_index in 0..matrix.width {
+            matrix.cols.push(MatrixCol::new(
+                column_index,
+                matrix.height as u32,
+                matrix.width,
+                matrix.config.read().unwrap().glyph.child_spawn_interval_ms as u64,
+            ));
         }
 
-        matrix
+        Ok(matrix)
     }
 
     pub fn update(&mut self, d: &mut RaylibDrawHandle, font: &mut Font) {
         for i in 0..self.width {
-            self.spawn_row(i);
+            self.spawn_col(i);
         }
-        for row in self.rows.iter_mut() {
-            row.update(d, font);
+        for col in self.cols.iter_mut() {
+            col.update(d, font);
         }
         if self.config.read().unwrap().debug {
             self.debug_grid(d, font);
@@ -73,18 +98,6 @@ impl MatrixWorld {
         self.font_width = (self.font_height as f32 * font_width_ratio).round() as i32;
     }
 
-    fn update_font_size(&mut self, increase: bool, font: &Font) {
-        if increase {
-            if self.font_height < MAX_FONT_SIZE {
-                self.font_height += 5;
-            }
-        } else {
-            if self.font_height > MIN_FONT_SIZE {
-                self.font_height -= 5;
-            }
-        }
-        self.update_font_width(font);
-    }
     fn get_widest_char_width(&self, font: &Font) -> f32 {
         let characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\
                                 abcdefghijklmnopqrstuvwxyz\
@@ -98,18 +111,15 @@ impl MatrixWorld {
     fn get_character_width(&self, font: &Font, character: &str) -> f32 {
         font.measure_text(character, self.font_height as f32, 0.0).x
     }
-    fn get_character_offset(&self, font: &Font, character: &str) -> f32 {
-        let width = self.get_character_width(font, character);
-        (self.get_widest_char_width(font) - width) / 2_f32
-    }
+
     fn get_height_internal_offset_range(&self) -> (i32, i32) {
         let range = (self.height_internal - self.height).abs() / 2;
         (-range, range)
     }
 
     pub fn debug_grid(&mut self, d: &mut RaylibDrawHandle, font: &mut Font) {
-        let (mut grid_size_x, mut grid_size_y) = self.calculate_grid_size();
-        let (mut grid_offset_x, mut grid_offset_y) = self.get_grid_offset();
+        let ( grid_size_x,  grid_size_y) = self.calculate_grid_size();
+        let ( grid_offset_x,  grid_offset_y) = self.get_grid_offset();
         self.update_font_width(font);
 
         let (min, max) = self.get_height_internal_offset_range();
@@ -134,10 +144,15 @@ impl MatrixWorld {
         }
     }
 
-    fn spawn_row(&mut self, index: i32) {
-        if let Some(row) = self.rows.get_mut(index as usize) {
-            if !row.is_spawned {
-                *row = MatrixRow::new(index, self.height, self.width);
+    fn spawn_col(&mut self, index: i32) {
+        if let Some(col) = self.cols.get_mut(index as usize) {
+            if !col.is_spawned {
+                *col = MatrixCol::new(
+                    index,
+                    self.height as u32,
+                    self.width,
+                    self.config.read().unwrap().glyph.child_spawn_interval_ms as u64,
+                );
             }
         }
     }

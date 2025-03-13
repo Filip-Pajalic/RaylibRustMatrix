@@ -12,8 +12,4 @@ impl GameState {
         }
     }
 
-    pub fn update_config(&self, new_config: Config) {
-        let mut config = self.config.write().unwrap();
-        *config = new_config;
-    }
 }
